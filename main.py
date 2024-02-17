@@ -5,30 +5,10 @@ from PyPDF2 import PdfReader
 # from aiAzureModel import AskAzure
 
 from flask import Flask, request, jsonify
-from flask_cors import CORS, cross_origin  # Import Flask-CORS
+from flask_cors import CORS
 app = Flask(__name__)
 
-CORS(app, resources={r"*": {"origins": "*"}})
-
-chat = AskChat()
-# chat = AskAzure()
-
-# database = "C:/Users/Alex/OneDrive/Documente/PersonalRepos/AI/LangChain/AzureCognitiveSearch/personal-database"
-
-# db_conti = "C:/Users/uif94707/Documents/myProjects/School-App/School-App/server/conti-database"
-
-# @app.after_request
-# def add_cors_headers(response):
-#     # Allow requests from any origin
-#     response.headers['Access-Control-Allow-Origin'] = '*'
-
-#     # Allow specific HTTP methods
-#     response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE'
-
-#     # Allow specific HTTP headers in the request
-#     response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
-
-    # return response
+CORS(app, origins=['http://localhost:3000'])
 
 @app.route('/test', methods=['GET'])
 def handleTest():
@@ -48,21 +28,34 @@ def handleTest2():
 
     return jsonify(chatMessage)
 
+
+@app.route('/register', methods=['POST'])
+def handleUserRegister():
+    query = request.json
+
+    user = query['user']
+    
+    print(user)
+
+    chatMessage = {'ok': True, 'message': "user received"}
+
+    return jsonify(chatMessage), 200
+
     
 
-@app.route('/chat', methods=['POST']) 
-def handle_to_server():
+# @app.route('/chat', methods=['POST']) 
+# def handle_to_server():
 
-    query = request.json
-    print(query)
+#     query = request.json
+#     print(query)
 
-    answer = chat.answering(query["message"])
+#     # answer = chat.answering(query["message"])
 
-    chatMessage = {"role": "chat", "message": answer}
+#     chatMessage = {"role": "chat", "message": answer}
 
-    print(chatMessage)
+#     print(chatMessage)
 
-    return jsonify(chatMessage)
+#     return jsonify(chatMessage)
 
 
 @app.route('/extract', methods=['POST']) 
