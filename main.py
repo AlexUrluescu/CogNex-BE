@@ -6,10 +6,17 @@ from PyPDF2 import PdfReader
 
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
+from flask_pymongo import pymongo
 app = Flask(__name__)
 
 CORS(app, origins=['http://localhost:3000'])
+# app.config["MONGO_URI"] = "mongodb+srv://alexurluescu23:WPYlknSsc3oUiHWY@cluster0.7b8l7me.mongodb.net/"
+CONNECTION_STRING = "mongodb+srv://alexurluescu23:WPYlknSsc3oUiHWY@cluster0.7b8l7me.mongodb.net/?retryWrites=true&w=majority"
+client = pymongo.MongoClient(CONNECTION_STRING, tls=True, tlsAllowInvalidCertificates=True)
+db = client.get_database('AiChat')
+# user_collection = pymongo.collection.Collection(db, 'users')
 
+ 
 pdf_directory = '/Users/alexandreurluescu/Documents/personal work/CogNex/CogNex-BE/server/uploads'
 
 @app.route('/api/pdfs', methods=['GET'])
@@ -57,14 +64,21 @@ def handleTest2():
 @app.route('/register', methods=['POST'])
 def handleUserRegister():
     query = request.json
-
     user = query['user']
-    
+     
     print(user)
 
-    chatMessage = {'ok': True, 'message': "user received"}
+    result = db.users.insert_one(user)
 
-    return jsonify(chatMessage), 200
+    print(f"result {result}")
+
+    inserted_document = db.users.find_one({"_id": result.inserted_id})
+    inserted_document['_id'] = str(inserted_document['_id'])
+
+    print(f"inserted_document", inserted_document)
+
+    return jsonify({"success": True, "user": inserted_document}), 200
+    # return inserted_document
 
     
 
