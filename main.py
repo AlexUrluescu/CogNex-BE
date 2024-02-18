@@ -4,11 +4,36 @@ import os
 from PyPDF2 import PdfReader
 # from aiAzureModel import AskAzure
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 app = Flask(__name__)
 
 CORS(app, origins=['http://localhost:3000'])
+
+pdf_directory = '/Users/alexandreurluescu/Documents/personal work/CogNex/CogNex-BE/server/uploads'
+
+@app.route('/api/pdfs', methods=['GET'])
+def get_pdfs():
+    # List all PDF files in the directory
+    pdf_files = [f for f in os.listdir(pdf_directory) if f.endswith('.pdf')]
+    return jsonify(pdf_files)
+
+
+@app.route('/pdfs/<path:filename>', methods=['GET'])
+def serve_pdf(filename):
+    # Ensure that the requested file is a PDF
+    if not filename.lower().endswith('.pdf'):
+        return "Not a PDF file", 400
+    
+    # Get the full path of the requested PDF file
+    file_path = os.path.join(pdf_directory, filename)
+    
+    # Check if the file exists
+    if not os.path.isfile(file_path):
+        return "PDF not found", 404
+    
+    # Serve the PDF file
+    return send_from_directory(pdf_directory, filename)
 
 @app.route('/test', methods=['GET'])
 def handleTest():
