@@ -16,6 +16,7 @@ client = pymongo.MongoClient(CONNECTION_STRING, tls=True, tlsAllowInvalidCertifi
 db = client.get_database('AiChat')
 # user_collection = pymongo.collection.Collection(db, 'users')
 
+app.config['USERS_DOCUMENTS'] = '/Users/alexandreurluescu/Documents/personal work/CogNex/CogNex-BE/server/users_documents'
  
 pdf_directory = '/Users/alexandreurluescu/Documents/personal work/CogNex/CogNex-BE/server/uploads'
 
@@ -65,17 +66,15 @@ def handleTest2():
 def handleUserLogin():
     query = request.json
     user = query['user']
-    print(user["email"])
     userFound = db.users.find_one({"email": user['email']})
-    userFound['_id'] = str(userFound['_id'])
 
-    print(f"userFind, {userFound}")
-
-    if(userFound == ''):
-        return jsonify({'message': "no user found", 'ok': False})
+    if(userFound == None):
+        return jsonify({'message': "no user found", 'ok': False, "user": None})
 
     if(userFound['password'] != user['password']):
-        return jsonify({"message": "password incorrect", 'ok': False})
+        return jsonify({"message": "password incorrect", 'ok': False, "user": None})
+    
+    userFound['_id'] = str(userFound['_id'])
 
     return jsonify({"message": 'success', 'ok': True, 'user': userFound})
 
@@ -84,20 +83,16 @@ def handleUserLogin():
 def handleUserRegister():
     query = request.json
     user = query['user']
-     
-    print(user)
 
     result = db.users.insert_one(user)
 
-    print(f"result {result}")
+    userStored = db.users.find_one({"_id": result.inserted_id})
+    userStored['_id'] = str(userStored['_id'])
 
-    inserted_document = db.users.find_one({"_id": result.inserted_id})
-    inserted_document['_id'] = str(inserted_document['_id'])
+    user_folder_path = os.path.join(app.config['USERS_DOCUMENTS'], userStored['_id'])
+    os.makedirs(user_folder_path)
 
-    print(f"inserted_document", inserted_document)
-
-    return jsonify({"success": True, "user": inserted_document}), 200
-    # return inserted_document
+    return jsonify({"message": "success", "ok": True, "user": userStored}), 200
 
     
 
