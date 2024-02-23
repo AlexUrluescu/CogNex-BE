@@ -61,6 +61,25 @@ def handleTest2():
     return jsonify(chatMessage)
 
 
+@app.route('/login', methods=['POST'])
+def handleUserLogin():
+    query = request.json
+    user = query['user']
+    print(user["email"])
+    userFound = db.users.find_one({"email": user['email']})
+    userFound['_id'] = str(userFound['_id'])
+
+    print(f"userFind, {userFound}")
+
+    if(userFound == ''):
+        return jsonify({'message': "no user found", 'ok': False})
+
+    if(userFound['password'] != user['password']):
+        return jsonify({"message": "password incorrect", 'ok': False})
+
+    return jsonify({"message": 'success', 'ok': True, 'user': userFound})
+
+
 @app.route('/register', methods=['POST'])
 def handleUserRegister():
     query = request.json
