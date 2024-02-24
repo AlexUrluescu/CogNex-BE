@@ -3,6 +3,7 @@ from aiModelClass import AskChat
 import os
 from PyPDF2 import PdfReader
 from dotenv import load_dotenv
+from bson.objectid import ObjectId
 # from aiAzureModel import AskAzure
 
 from flask import Flask, request, jsonify, send_from_directory
@@ -45,16 +46,32 @@ def serve_pdf(filename):
     if not os.path.isfile(file_path):
         return "PDF not found", 404
     
+    file = send_from_directory(pdf_directory, filename)
+    
     # Serve the PDF file
-    return send_from_directory(pdf_directory, filename)
+    return file
 
-@app.route('/test', methods=['GET'])
-def handleTest():
-    name = 'Alex'
+@app.route('/testApi/<path:userId>', methods=['GET'])
+def serve_pdf2(userId):
 
-    nameTest = {"name": name}
+    user_documents_path = os.path.join(app.config['USERS_DOCUMENTS'], userId)
 
-    return jsonify(nameTest)
+    # Get the full path of the requested PDF file
+    files = os.listdir(user_documents_path)
+
+    # Serve the PDF file
+    # return send_from_directory(pdf_directory, filename)
+    return jsonify({"ok": True, "filesName": files})
+
+@app.route('/currentUser/<path:userId>', methods=['GET'])
+def handleTest(userId):
+    print(userId)
+
+    userFound = db.users.find_one({'_id': ObjectId(userId)})
+
+    userFound['_id'] = str(userFound['_id'])
+
+    return jsonify({"message": 'success', 'ok': True, 'user': userFound})
 
 
 @app.route('/test2', methods=['POST'])
@@ -87,7 +104,7 @@ def handleUserLogin():
 @app.route('/register', methods=['POST'])
 def handleUserRegister():
     query = request.json
-    user = query['user']
+    user = query['resgiterUser']
 
     result = db.users.insert_one(user)
 
@@ -124,6 +141,8 @@ def extract_content():
     pdf = request.files['pdf']
     userId = request.form['userId']
 
+    print(userId)
+
     if pdf.filename == '':
         return jsonify({'error': 'No selected file'})
     
@@ -132,7 +151,28 @@ def extract_content():
     pdf_path = os.path.join(subdirectory_path, pdf.filename)
     pdf.save(pdf_path)
 
-    return jsonify({'message': 'PDF uploaded successfully'})
+    user = db.users.find_one({'_id': ObjectId(userId)})
+
+    print(user)
+
+    if user:
+        # Modify the projects field
+        updated_files = user.get('files', [])
+        updated_files.append(pdf.filename)
+
+        # Update the user document
+        db.users.update_one(
+            {'_id': ObjectId(userId)},
+            {'$set': {'files': updated_files}}
+        )
+
+        return jsonify({'message': 'PDF uploaded successfully'})
+    else:
+        return 'User not found', 404
+
+
+
+
 
 def read_pdf_content(pdf_path):
     pdf_content = ''
