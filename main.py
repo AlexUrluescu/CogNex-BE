@@ -118,28 +118,19 @@ def handleUserRegister():
 
 @app.route('/extract', methods=['POST']) 
 def extract_content():
-
-    # Set the folder to store uploaded PDFs
-    UPLOAD_FOLDER = 'uploads'
-    app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-
-    # Ensure the upload folder exists
-    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
     if 'pdf' not in request.files:
         return jsonify({'error': 'No PDF part'})
 
     pdf = request.files['pdf']
+    userId = request.form['userId']
+
     if pdf.filename == '':
         return jsonify({'error': 'No selected file'})
     
     # Save the PDF file
-    pdf_path = os.path.join(app.config['UPLOAD_FOLDER'], pdf.filename)
+    subdirectory_path = os.path.join(app.config['USERS_DOCUMENTS'], userId)
+    pdf_path = os.path.join(subdirectory_path, pdf.filename)
     pdf.save(pdf_path)
-
-    # Read the content of the PDF
-    pdf_content = read_pdf_content(pdf_path)
-    print(pdf_content)
 
     return jsonify({'message': 'PDF uploaded successfully'})
 
