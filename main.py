@@ -2,33 +2,51 @@
 from aiModelClass import AskChat
 import os
 from PyPDF2 import PdfReader
+from dotenv import load_dotenv
 # from aiAzureModel import AskAzure
 
-from flask import Flask, request, jsonify
-from flask_cors import CORS, cross_origin  # Import Flask-CORS
+from flask import Flask, request, jsonify, send_from_directory
+from flask_cors import CORS
+from flask_pymongo import pymongo
 app = Flask(__name__)
 
-CORS(app, resources={r"*": {"origins": "*"}})
+load_dotenv()
 
-chat = AskChat()
-# chat = AskAzure()
+ROUTE = os.environ.get("ROUTE")
 
-# database = "C:/Users/Alex/OneDrive/Documente/PersonalRepos/AI/LangChain/AzureCognitiveSearch/personal-database"
+CORS(app, origins=[ROUTE])
 
-# db_conti = "C:/Users/uif94707/Documents/myProjects/School-App/School-App/server/conti-database"
+CONNECTION_STRING_MONGODB = os.environ.get("CONNECTION_STRING_MONGODB")
 
-# @app.after_request
-# def add_cors_headers(response):
-#     # Allow requests from any origin
-#     response.headers['Access-Control-Allow-Origin'] = '*'
+client = pymongo.MongoClient(CONNECTION_STRING_MONGODB, tls=True, tlsAllowInvalidCertificates=True)
+db = client.get_database('AiChat')
 
-#     # Allow specific HTTP methods
-#     response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE'
+app.config['USERS_DOCUMENTS'] = '/Users/alexandreurluescu/Documents/personal work/CogNex/CogNex-BE/server/users_documents'
+ 
+pdf_directory = '/Users/alexandreurluescu/Documents/personal work/CogNex/CogNex-BE/server/uploads'
 
-#     # Allow specific HTTP headers in the request
-#     response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+@app.route('/api/pdfs', methods=['GET'])
+def get_pdfs():
+    # List all PDF files in the directory
+    pdf_files = [f for f in os.listdir(pdf_directory) if f.endswith('.pdf')]
+    return jsonify(pdf_files)
 
-    # return response
+
+@app.route('/pdfs/<path:filename>', methods=['GET'])
+def serve_pdf(filename):
+    # Ensure that the requested file is a PDF
+    if not filename.lower().endswith('.pdf'):
+        return "Not a PDF file", 400
+    
+    # Get the full path of the requested PDF file
+    file_path = os.path.join(pdf_directory, filename)
+    
+    # Check if the file exists
+    if not os.path.isfile(file_path):
+        return "PDF not found", 404
+    
+    # Serve the PDF file
+    return send_from_directory(pdf_directory, filename)
 
 @app.route('/test', methods=['GET'])
 def handleTest():
@@ -48,21 +66,54 @@ def handleTest2():
 
     return jsonify(chatMessage)
 
+
+@app.route('/login', methods=['POST'])
+def handleUserLogin():
+    query = request.json
+    user = query['user']
+    userFound = db.users.find_one({"email": user['email']})
+
+    if(userFound == None):
+        return jsonify({'message': "no user found", 'ok': False, "user": None})
+
+    if(userFound['password'] != user['password']):
+        return jsonify({"message": "password incorrect", 'ok': False, "user": None})
+    
+    userFound['_id'] = str(userFound['_id'])
+
+    return jsonify({"message": 'success', 'ok': True, 'user': userFound})
+
+
+@app.route('/register', methods=['POST'])
+def handleUserRegister():
+    query = request.json
+    user = query['user']
+
+    result = db.users.insert_one(user)
+
+    userStored = db.users.find_one({"_id": result.inserted_id})
+    userStored['_id'] = str(userStored['_id'])
+
+    user_folder_path = os.path.join(app.config['USERS_DOCUMENTS'], userStored['_id'])
+    os.makedirs(user_folder_path)
+
+    return jsonify({"message": "success", "ok": True, "user": userStored}), 200
+
     
 
-@app.route('/chat', methods=['POST']) 
-def handle_to_server():
+# @app.route('/chat', methods=['POST']) 
+# def handle_to_server():
 
-    query = request.json
-    print(query)
+#     query = request.json
+#     print(query)
 
-    answer = chat.answering(query["message"])
+#     # answer = chat.answering(query["message"])
 
-    chatMessage = {"role": "chat", "message": answer}
+#     chatMessage = {"role": "chat", "message": answer}
 
-    print(chatMessage)
+#     print(chatMessage)
 
-    return jsonify(chatMessage)
+#     return jsonify(chatMessage)
 
 
 @app.route('/extract', methods=['POST']) 
