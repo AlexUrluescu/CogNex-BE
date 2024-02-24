@@ -2,6 +2,7 @@
 from aiModelClass import AskChat
 import os
 from PyPDF2 import PdfReader
+from dotenv import load_dotenv
 # from aiAzureModel import AskAzure
 
 from flask import Flask, request, jsonify, send_from_directory
@@ -9,12 +10,16 @@ from flask_cors import CORS
 from flask_pymongo import pymongo
 app = Flask(__name__)
 
-CORS(app, origins=['http://localhost:3000'])
-# app.config["MONGO_URI"] = "mongodb+srv://alexurluescu23:WPYlknSsc3oUiHWY@cluster0.7b8l7me.mongodb.net/"
-CONNECTION_STRING = "mongodb+srv://alexurluescu23:WPYlknSsc3oUiHWY@cluster0.7b8l7me.mongodb.net/?retryWrites=true&w=majority"
-client = pymongo.MongoClient(CONNECTION_STRING, tls=True, tlsAllowInvalidCertificates=True)
+load_dotenv()
+
+ROUTE = os.environ.get("ROUTE")
+
+CORS(app, origins=[ROUTE])
+
+CONNECTION_STRING_MONGODB = os.environ.get("CONNECTION_STRING_MONGODB")
+
+client = pymongo.MongoClient(CONNECTION_STRING_MONGODB, tls=True, tlsAllowInvalidCertificates=True)
 db = client.get_database('AiChat')
-# user_collection = pymongo.collection.Collection(db, 'users')
 
 app.config['USERS_DOCUMENTS'] = '/Users/alexandreurluescu/Documents/personal work/CogNex/CogNex-BE/server/users_documents'
  
