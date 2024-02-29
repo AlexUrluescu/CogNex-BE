@@ -51,6 +51,15 @@ def serve_pdf(filename):
     # Serve the PDF file
     return file
 
+@app.route("/users", methods=['GET'])
+def get_all_users():
+    users = list(db.users.find({}))
+
+    for user in users:
+        user['_id'] = str(user['_id'])
+
+    return jsonify({"message": 'success', 'ok': True, 'users': users})
+
 @app.route('/testApi/<path:userId>', methods=['GET'])
 def serve_pdf2(userId):
 
