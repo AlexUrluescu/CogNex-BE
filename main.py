@@ -60,6 +60,17 @@ def get_all_users():
 
     return jsonify({"message": 'success', 'ok': True, 'users': users})
 
+
+@app.route("/chats", methods=['GET'])
+def get_all_chats():
+    chats = list(db.chats.find({}))
+
+    for chat in chats:
+        chat['_id'] = str(chat['_id'])
+
+    return jsonify({"message": 'success', 'ok': True, 'chats': chats})
+
+
 @app.route('/testApi/<path:userId>', methods=['GET'])
 def serve_pdf2(userId):
 
@@ -190,6 +201,9 @@ def create_chat_room():
     query = request.json
     chat = query['chat']
 
+    print("chat", chat)
+    print("chatFiles", chat['files'])
+
     creatorId = chat['creator']
 
     savedChat = db.chats.insert_one(chat)
@@ -197,7 +211,11 @@ def create_chat_room():
     chatStored = db.chats.find_one({"_id": savedChat.inserted_id})
     chatStored['_id'] = str(chatStored['_id'])
 
-    userCreator = db.users.update_one({"_id": ObjectId(creatorId)}, {'$set': {'chats': [chatStored['_id']]}})
+    # user = db.users.find_one({'_id': ObjectId(creatorId)})
+
+    # user['chats'].append(chatStored['_id'])
+
+    # userCreator = db.users.update_one({"_id": ObjectId(creatorId)}, {'$set': {'chats': user['chats'] }})
 
     return jsonify({"message": "success", "ok": True, "chat": chatStored}), 200
 
