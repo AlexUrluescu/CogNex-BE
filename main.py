@@ -15,16 +15,16 @@ load_dotenv()
 
 ROUTE = os.environ.get("ROUTE")
 
-CORS(app, origins=[ROUTE])
+CORS(app)
 
 CONNECTION_STRING_MONGODB = os.environ.get("CONNECTION_STRING_MONGODB")
 
 client = pymongo.MongoClient(CONNECTION_STRING_MONGODB, tls=True, tlsAllowInvalidCertificates=True)
 db = client.get_database('AiChat')
 
-app.config['USERS_DOCUMENTS'] = '/Users/alexandreurluescu/Documents/personal work/CogNex/CogNex-BE/server/users_documents'
+app.config['USERS_DOCUMENTS'] = '/Users/alexandreurluescu/Documents/current work/CogNex/CogNex-BE/server/users_documents'
  
-pdf_directory = '/Users/alexandreurluescu/Documents/personal work/CogNex/CogNex-BE/server/uploads'
+pdf_directory = '/Users/alexandreurluescu/Documents/current work/CogNex/CogNex-BE/server/uploads'
 
 @app.route('/api/pdfs', methods=['GET'])
 def get_pdfs():
@@ -144,42 +144,62 @@ def handleUserRegister():
 
 @app.route('/extract', methods=['POST']) 
 def extract_content():
-    if 'pdf' not in request.files:
+    print(f"req {request.files}")
+    if 'pdfs' not in request.files:
         return jsonify({'error': 'No PDF part'})
 
-    pdf = request.files['pdf']
+    pdfs = request.files.getlist('pdfs')
     userId = request.form['userId']
 
-    print(userId)
+    print(f"pdf {pdfs}")
+    print(f"userId {userId}")
 
-    if pdf.filename == '':
-        return jsonify({'error': 'No selected file'})
-    
-    # Save the PDF file
-    subdirectory_path = os.path.join(app.config['USERS_DOCUMENTS'], userId)
-    pdf_path = os.path.join(subdirectory_path, pdf.filename)
-    pdf.save(pdf_path)
+    for pdf in pdfs:
 
-    user = db.users.find_one({'_id': ObjectId(userId)})
+        if pdf.filename == '':
+            return jsonify({'error': 'No selected file'})
+        
+        # Save the PDF file
+        subdirectory_path = os.path.join(app.config['USERS_DOCUMENTS'], userId)
+        pdf_path = os.path.join(subdirectory_path, pdf.filename)
+        pdf.save(pdf_path)
 
-    print(user)
+        user = db.users.find_one({'_id': ObjectId(userId)})
 
-    if user:
-        # Modify the projects field
-        updated_files = user.get('files', [])
-        updated_files.append(pdf.filename)
+        print(user)
 
-        # Update the user document
-        db.users.update_one(
-            {'_id': ObjectId(userId)},
-            {'$set': {'files': updated_files}}
-        )
+        if user:
+            # Modify the projects field
+            updated_files = user.get('files', [])
+            updated_files.append(pdf.filename)
 
-        return jsonify({'message': 'PDF uploaded successfully'})
-    else:
-        return 'User not found', 404
+            # Update the user document
+            db.users.update_one(
+                {'_id': ObjectId(userId)},
+                {'$set': {'files': updated_files}}
+            )
 
+            
+        else:
+            return 'User not found', 404
+        
+    return jsonify({'message': 'PDF uploaded successfully', "ok": True})
 
+@app.route('/create_chat', methods=['POST']) 
+def create_chat_room():
+    query = request.json
+    chat = query['chat']
+
+    creatorId = chat['creator']
+
+    savedChat = db.chats.insert_one(chat)
+
+    chatStored = db.chats.find_one({"_id": savedChat.inserted_id})
+    chatStored['_id'] = str(chatStored['_id'])
+
+    userCreator = db.users.update_one({"_id": ObjectId(creatorId)}, {'$set': {'chats': [chatStored['_id']]}})
+
+    return jsonify({"message": "success", "ok": True, "chat": chatStored}), 200
 
 
 
