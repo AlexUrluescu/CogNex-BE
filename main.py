@@ -212,9 +212,7 @@ def create_chat_room():
     chatStored['_id'] = str(chatStored['_id'])
 
     # user = db.users.find_one({'_id': ObjectId(creatorId)})
-
     # user['chats'].append(chatStored['_id'])
-
     # userCreator = db.users.update_one({"_id": ObjectId(creatorId)}, {'$set': {'chats': user['chats'] }})
 
     return jsonify({"message": "success", "ok": True, "chat": chatStored}), 200
