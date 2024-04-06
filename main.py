@@ -10,6 +10,7 @@ from utils import Utils
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from flask_pymongo import pymongo
+from utils import Utils
 app = Flask(__name__)
 
 load_dotenv()
@@ -19,6 +20,11 @@ ROUTE = os.environ.get("ROUTE")
 CORS(app)
 
 CONNECTION_STRING_MONGODB = os.environ.get("CONNECTION_STRING_MONGODB")
+
+
+utils = Utils()
+
+chromaDbPath = 'testing'
 
 client = pymongo.MongoClient(CONNECTION_STRING_MONGODB, tls=True, tlsAllowInvalidCertificates=True)
 db = client.get_database('AiChat')
@@ -143,6 +149,9 @@ def get_all_users():
     return jsonify({"message": 'success', 'ok': True, 'users': users})
 
 
+
+
+
 @app.route("/chats", methods=['GET'])
 def get_all_chats():
     chats = list(db.chats.find({}))
@@ -201,6 +210,19 @@ def handleUserLogin():
     userFound['_id'] = str(userFound['_id'])
 
     return jsonify({"message": 'success', 'ok': True, 'user': userFound})
+
+
+@app.route('/info-chat', methods=['POST']) 
+def getDocsFromChromaCollectByChat():
+    query = request.json
+    creatorId = query['creatorId']
+    chatId = query['chatId']
+    subdirectory_path = os.path.join(app.config['USERS_DOCUMENTS'], creatorId)
+
+    documents = utils.storeDataIntoChroma(subdirectory_path, chromaDbPath, chatId)
+
+    return jsonify({"message": 'success', 'ok': True, 'documents': documents})
+
 
 
 @app.route('/subscribed', methods=['POST'])
@@ -296,6 +318,9 @@ def extract_content():
         else:
             return 'User not found', 404
         
+    
+    # utils.storeDataIntoChroma(subdirectory_path, chromaDbPath, userId)
+        
     return jsonify({'message': 'PDF uploaded successfully', "ok": True})
 
 @app.route('/create_chat', methods=['POST']) 
@@ -312,6 +337,10 @@ def create_chat_room():
 
     chatStored = db.chats.find_one({"_id": savedChat.inserted_id})
     chatStored['_id'] = str(chatStored['_id'])
+
+    subdirectory_path = os.path.join(app.config['USERS_DOCUMENTS'], str(chatStored['creator']))
+
+    utils.storeDataIntoChroma(subdirectory_path, chromaDbPath, str(chatStored['_id']))
 
     # user = db.users.find_one({'_id': ObjectId(creatorId)})
     # user['chats'].append(chatStored['_id'])
