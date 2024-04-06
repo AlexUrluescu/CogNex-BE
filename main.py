@@ -5,6 +5,7 @@ from PyPDF2 import PdfReader
 from dotenv import load_dotenv
 from bson.objectid import ObjectId
 # from aiAzureModel import AskAzure
+from utils import Utils
 
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
@@ -25,6 +26,10 @@ db = client.get_database('AiChat')
 app.config['USERS_DOCUMENTS'] = '/Users/alexandreurluescu/Documents/current work/CogNex/CogNex-BE/server/users_documents'
  
 pdf_directory = '/Users/alexandreurluescu/Documents/current work/CogNex/CogNex-BE/server/uploads'
+
+user_documents_global_directory = '/Users/alexandreurluescu/Documents/current work/CogNex/CogNex-BE/server/users_documents'
+
+
 
 @app.route('/api/pdfs', methods=['GET'])
 def get_pdfs():
@@ -50,6 +55,83 @@ def serve_pdf(filename):
     
     # Serve the PDF file
     return file
+
+def testing(subDirectory, filename):
+    # Ensure that the requested file is a PDF
+    if not filename.lower().endswith('.pdf'):
+        return "Not a PDF file", 400
+    
+    # Get the full path of the requested PDF file
+    file_path = os.path.join(subDirectory, filename)
+    
+    # Check if the file exists
+    if not os.path.isfile(file_path):
+        return "PDF not found", 404
+    
+    file = send_from_directory(subDirectory, filename)
+
+    print(file)
+    
+    # Serve the PDF file
+    return file
+
+
+@app.route('/user-pdfs/<path:userId>', methods=['GET'])
+def serve_pdf123(userId):
+
+
+    pdf_files = []
+
+    test = []
+
+    for root, dirs, files in os.walk(user_documents_global_directory):
+        if userId in dirs:
+            userId_dir = os.path.join(root, userId)
+            pdf_files.extend([os.path.basename(file) for file in os.listdir(userId_dir) if file.endswith('.pdf')])
+
+    subDirectoryPath = os.path.join(user_documents_global_directory, userId)
+    
+
+    # for pdf in pdf_files:
+    #     print(pdf)
+    #     fileName = testing(subDirectoryPath, pdf)
+    #     test.append(fileName)
+
+    pdf = pdf_files[0]
+    fileName = testing(subDirectoryPath, pdf)
+    test.append(fileName)
+
+    for chat in test:
+        chat = str(chat)
+
+    return test
+
+    # Get the full path of the requested PDF file
+    # file_path = os.path.join(user_documents_global_directory, userId)
+    
+    # # Check if the file exists
+    # if not os.path.isfile(file_path):
+    #     return "PDF not found", 404
+    
+    # file = send_from_directory(user_documents_global_directory, filename)
+    
+    # # Serve the PDF file
+    # return file
+
+
+# def list_pdf_files(directory):
+#     pdf_files = []
+#     for root, dirs, files in os.walk(directory):
+#         if "sub2" in dirs:
+#             sub2_dir = os.path.join(root, "sub2")
+#             pdf_files.extend([os.path.join(sub2_dir, file) for file in os.listdir(sub2_dir) if file.endswith('.pdf')])
+#     return pdf_files
+
+# directory = "/path/to/your/directory"
+# pdf_files = list_pdf_files(directory)
+# print("PDF files in the 'sub2' directories:")
+# for pdf_file in pdf_files:
+#     print(pdf_file)
 
 @app.route("/users", methods=['GET'])
 def get_all_users():
@@ -119,6 +201,26 @@ def handleUserLogin():
     userFound['_id'] = str(userFound['_id'])
 
     return jsonify({"message": 'success', 'ok': True, 'user': userFound})
+
+
+@app.route('/subscribed', methods=['POST'])
+def handleUserSubscribed():
+    query = request.json
+    userId = query['userId']
+    chatId = query['chatId']
+
+    chatUpdated = db.chats.find_one_and_update(
+        {'_id': ObjectId(chatId)},
+        {'$addToSet': {'users': userId}}, 
+        return_document=True
+    )
+
+    if chatUpdated:
+        chatUpdated['_id'] = str(chatUpdated['_id'])
+        print(chatUpdated['users'])
+        return jsonify({"message": 'success', 'ok': True, 'chat': chatUpdated})
+    else:
+        return jsonify({"message": 'Chat not found', 'ok': False}), 404
 
 
 @app.route('/register', methods=['POST'])
