@@ -1,4 +1,5 @@
 
+import glob
 from aiModelClass import AskChat
 import os
 from PyPDF2 import PdfReader
@@ -30,6 +31,7 @@ client = pymongo.MongoClient(CONNECTION_STRING_MONGODB, tls=True, tlsAllowInvali
 db = client.get_database('AiChat')
 
 app.config['USERS_DOCUMENTS'] = '/Users/alexandreurluescu/Documents/current work/CogNex/CogNex-BE/server/users_documents'
+app.config['USERS_DOCUMENTS2'] = '/Users/alexandreurluescu/Documents/current work/CogNex/CogNex-BE/server/users_documents2'
  
 pdf_directory = '/Users/alexandreurluescu/Documents/current work/CogNex/CogNex-BE/server/uploads'
 
@@ -215,13 +217,12 @@ def handleUserLogin():
 @app.route('/info-chat', methods=['POST']) 
 def getDocsFromChromaCollectByChat():
     query = request.json
-    creatorId = query['creatorId']
     chatId = query['chatId']
-    subdirectory_path = os.path.join(app.config['USERS_DOCUMENTS'], creatorId)
+    question = query['query']
 
-    documents = utils.storeDataIntoChroma(subdirectory_path, chromaDbPath, chatId)
+    results = utils.getRevevantInfoFromDb(chromaDbPath, chatId, question)
 
-    return jsonify({"message": 'success', 'ok': True, 'documents': documents})
+    return jsonify({"message": 'success', 'ok': True, 'documents': results})
 
 
 
@@ -257,6 +258,9 @@ def handleUserRegister():
 
     user_folder_path = os.path.join(app.config['USERS_DOCUMENTS'], userStored['_id'])
     os.makedirs(user_folder_path)
+
+    user_folder_path2 = os.path.join(app.config['USERS_DOCUMENTS2'], userStored['_id'])
+    os.makedirs(user_folder_path2)
 
     return jsonify({"message": "success", "ok": True, "user": userStored}), 200
 
@@ -295,7 +299,7 @@ def extract_content():
             return jsonify({'error': 'No selected file'})
         
         # Save the PDF file
-        subdirectory_path = os.path.join(app.config['USERS_DOCUMENTS'], userId)
+        subdirectory_path = os.path.join(app.config['USERS_DOCUMENTS2'], userId)
         pdf_path = os.path.join(subdirectory_path, pdf.filename)
         pdf.save(pdf_path)
 
@@ -317,11 +321,26 @@ def extract_content():
             
         else:
             return 'User not found', 404
-        
     
     # utils.storeDataIntoChroma(subdirectory_path, chromaDbPath, userId)
         
     return jsonify({'message': 'PDF uploaded successfully', "ok": True})
+
+
+def delete_files_in_directory(directory):
+    # Get a list of all files within the directory
+    files = glob.glob(os.path.join(directory, "*"))
+    
+    # Iterate over the list of files
+    for file in files:
+        try:
+            # Delete each file
+            os.remove(file)
+            print(f"Deleted: {file}")
+        except Exception as e:
+            print(f"Error deleting {file}: {e}")
+
+
 
 @app.route('/create_chat', methods=['POST']) 
 def create_chat_room():
@@ -338,13 +357,12 @@ def create_chat_room():
     chatStored = db.chats.find_one({"_id": savedChat.inserted_id})
     chatStored['_id'] = str(chatStored['_id'])
 
-    subdirectory_path = os.path.join(app.config['USERS_DOCUMENTS'], str(chatStored['creator']))
+    subdirectory_path = os.path.join(app.config['USERS_DOCUMENTS2'], str(chatStored['creator']))
+    subdirectory_path2 = os.path.join(app.config['USERS_DOCUMENTS'], str(chatStored['creator']))
 
     utils.storeDataIntoChroma(subdirectory_path, chromaDbPath, str(chatStored['_id']))
 
-    # user = db.users.find_one({'_id': ObjectId(creatorId)})
-    # user['chats'].append(chatStored['_id'])
-    # userCreator = db.users.update_one({"_id": ObjectId(creatorId)}, {'$set': {'chats': user['chats'] }})
+    utils.move_files(subdirectory_path, subdirectory_path2)
 
     return jsonify({"message": "success", "ok": True, "chat": chatStored}), 200
 
