@@ -1,19 +1,19 @@
 from utils import Utils
+import chromadb
+
+chromaDbPath = 'testing'
+collectionName = '661968510642d8c2769ca19a'
+
 
 utils = Utils()
 
-docsPath = "./testing_personal_documents/"
-chromaDbPath = "testing"
+data = utils.getDataFromChromaDb(chromaDbPath, collectionName)
 
-collection = '6612b895948177eb9ba4033c'
-
-query = "Key skills of Messi?"
-
-# utils.storeDataIntoChroma(docsPath, chromaDbPath, 'test2')
-utils.getRevevantInfoFromDb(chromaDbPath, collection, query)
+print(data)
 
 
-# Example usage:
-# source_directory = "/Users/alexandreurluescu/Documents/current work/CogNex/CogNex-BE/server/users_documents2/65e46bd58d312e7ab5895adf"
-# destination_directory = "/Users/alexandreurluescu/Documents/current work/CogNex/CogNex-BE/server/users_documents/65e46bd58d312e7ab5895adf"
-# move_files(source_directory, destination_directory)
+# Create a ChromaDB client (you can use either PersistentClient or HttpClient)
+client = chromadb.PersistentClient(path="your_database_path")
+
+# Create a new collection (replace "my_collection" with your desired collection name)
+newCollection = client.create_collection("my_collection")
