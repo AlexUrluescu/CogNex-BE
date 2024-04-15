@@ -222,7 +222,9 @@ def getDocsFromChromaCollectByChat():
 
     results = utils.getRevevantInfoFromDb(chromaDbPath, chatId, question)
 
-    return jsonify({"message": 'success', 'ok': True, 'documents': results})
+    llmResponse = utils.getLlmResponse(query=question, docs_prepared=results)
+
+    return jsonify({"message": 'success', 'ok': True, 'response': llmResponse})
 
 
 

@@ -5,8 +5,43 @@ from langchain.embeddings.sentence_transformer import SentenceTransformerEmbeddi
 import chromadb
 import shutil
 import os
-
+from langchain.chains import LLMChain
+from langchain_core.prompts import PromptTemplate
+# from langchain_openai import OpenAI
+from langchain.chat_models import ChatOpenAI
 class Utils():
+
+    def __init__(self) -> ChatOpenAI:
+
+        self.openai_api_key = "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"
+        
+
+        self.template = """QUESTION: {query}
+
+            INFORMATION: {docs_prepared}
+
+            Please provide a reponse on base the INFORMATION.
+
+            If you dont find anything similar in the INFORMATION, please responde with: "I dont have this information" """
+
+
+    def getLlmResponse(self, query, docs_prepared):
+
+        print(query)
+
+        prompt = PromptTemplate.from_template(self.template)
+        llm = ChatOpenAI(
+            model_name='gpt-3.5-turbo-16k',
+            temperature=0.9,
+            openai_api_key=self.openai_api_key,
+            max_tokens=50
+        )
+        llm_chain = LLMChain(prompt=prompt, llm=llm)
+        response = llm_chain.invoke({"query": query, "docs_prepared": docs_prepared})
+
+        print(response)
+
+        return response
  
         
     def storeDataIntoChroma(self, docsPath: str, chromaDbPath: str, collectionName: str):
@@ -67,7 +102,9 @@ class Utils():
 
         print(results)
 
-        return results
+        print(collectionName)
+
+        return results['documents'][0][0]
 
         # retriever = collection.as_retriever(search_type="similarity", search_kwargs = {"k": 5})
 
