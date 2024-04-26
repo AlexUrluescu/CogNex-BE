@@ -62,6 +62,26 @@ class Utils():
         return data['documents']
     
 
+    def storeDataIntoChromaTeleport(self, chromaDbPath: str, collectionName):
+        # loader = DirectoryLoader(docsPath, glob="./*.pdf", loader_cls=PyPDFLoader)
+        # documents = loader.load()
+
+        data = self.getDataFromChromaDb(chromaDbPath, collectionName)
+
+        # text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=300)
+        # docs = text_splitter.split_documents(documents)
+
+        # embedding_function = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
+
+        # database = Chroma.from_documents(docs, embedding_function, persist_directory=chromaDbPath, collection_name=collectionName)
+
+        # data = database._collection.get()
+
+        print(data['documents'])
+
+        # return data['documents']
+    
+
     def storeSpecificPdfDataIntoChroma(self, pdfPath: str, chromaDbPath: str, collectionName: str):
         loader = PyPDFLoader(pdfPath)
         document = loader.load()
