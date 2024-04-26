@@ -1,4 +1,5 @@
 
+import base64
 import glob
 from aiModelClass import AskChat
 import os
@@ -12,6 +13,7 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from flask_pymongo import pymongo
 from utils import Utils
+from bson import Binary
 app = Flask(__name__)
 
 load_dotenv()
@@ -26,6 +28,7 @@ CONNECTION_STRING_MONGODB = os.environ.get("CONNECTION_STRING_MONGODB")
 utils = Utils()
 
 chromaDbPath = 'testing'
+chromaDbTeleportsPath = 'teleports'
 
 client = pymongo.MongoClient(CONNECTION_STRING_MONGODB, tls=True, tlsAllowInvalidCertificates=True)
 db = client.get_database('AiChat')
@@ -164,6 +167,16 @@ def get_all_chats():
     return jsonify({"message": 'success', 'ok': True, 'chats': chats})
 
 
+@app.route("/teleports", methods=['GET'])
+def get_all_teleports():
+    teleports = list(db.teleports.find({}))
+
+    for teleport in teleports:
+        teleport['_id'] = str(teleport['_id'])
+
+    return jsonify({"message": 'success', 'ok': True, 'teleports': teleports})
+
+
 @app.route('/testApi/<path:userId>', methods=['GET'])
 def serve_pdf2(userId):
 
@@ -206,10 +219,12 @@ def handleUserLogin():
     if(userFound == None):
         return jsonify({'message': "no user found", 'ok': False, "user": None})
 
-    if(userFound['password'] != user['password']):
-        return jsonify({"message": "password incorrect", 'ok': False, "user": None})
+    # if(userFound['password'] != user['password']):
+    #     return jsonify({"message": "password incorrect", 'ok': False, "user": None})
     
     userFound['_id'] = str(userFound['_id'])
+    # image_data_base64 = base64.b64encode(userFound['photo'].read()).decode("utf-8")
+    # userFound['photo'] = image_data_base64
 
     return jsonify({"message": 'success', 'ok': True, 'user': userFound})
 
@@ -237,6 +252,27 @@ def handleUserSubscribed():
     chatUpdated = db.chats.find_one_and_update(
         {'_id': ObjectId(chatId)},
         {'$addToSet': {'users': userId}}, 
+        return_document=True
+    )
+
+    if chatUpdated:
+        chatUpdated['_id'] = str(chatUpdated['_id'])
+        print(chatUpdated['users'])
+        return jsonify({"message": 'success', 'ok': True, 'chat': chatUpdated})
+    else:
+        return jsonify({"message": 'Chat not found', 'ok': False}), 404
+    
+
+
+@app.route('/add-review', methods=['POST'])
+def handleAddReview():
+    query = request.json
+    review = query['review']
+    chatId = query['chatId']
+
+    chatUpdated = db.chats.find_one_and_update(
+        {'_id': ObjectId(chatId)},
+        {'$addToSet': {'reviews': review}}, 
         return_document=True
     )
 
@@ -281,6 +317,35 @@ def handleUserRegister():
 #     print(chatMessage)
 
 #     return jsonify(chatMessage)
+
+@app.route('/upload-photo', methods=['POST']) 
+def upload_photo():
+    if 'images' not in request.files:
+        return jsonify({'error': 'No PDF part'})
+
+    images = request.files.getlist('images')
+
+    print(images)
+    print(images[0])
+
+    image_data = images[0].read()
+
+    image_doc = {'image': Binary(image_data)}
+
+    test2 = {
+        'name': 'Alex'
+    }
+
+    print("intraaa1")
+
+    user = db.poze.insert_one(image_doc)
+    db.users.update_one({'_id': ObjectId('65e46bd58d312e7ab5895adf')}, {'$set': {'photo': image_doc['image']}})
+    print(user)
+
+    chatStored = db.poze.find_one({"name": 'Alex'})
+
+    print("intraaaa")
+    return jsonify({'message': 'Images uploaded successfully', "ok": True})
 
 
 @app.route('/extract', methods=['POST']) 
@@ -368,7 +433,22 @@ def create_chat_room():
 
     return jsonify({"message": "success", "ok": True, "chat": chatStored}), 200
 
+@app.route('/create_teleport', methods=['POST']) 
+def create_teleport():
+    query = request.json
+    teleport = query['teleport']
+    print(teleport)
+    savedTeleport = db.teleports.insert_one(teleport)
 
+    teleportStored = db.teleports.find_one({"_id": savedTeleport.inserted_id})
+    teleportStored['_id'] = str(teleportStored['_id'])
+
+    # utils.storeDataIntoChromaTeleport()
+
+
+    print(teleportStored)
+
+    return jsonify({"message": "success", "ok": True, "teleport": teleportStored}), 200
 
 def read_pdf_content(pdf_path):
     pdf_content = ''
