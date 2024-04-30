@@ -9,11 +9,13 @@ from langchain.chains import LLMChain
 from langchain_core.prompts import PromptTemplate
 # from langchain_openai import OpenAI
 from langchain.chat_models import ChatOpenAI
+import uuid
 class Utils():
 
     def __init__(self) -> ChatOpenAI:
 
         self.openai_api_key = "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"
+        
         
 
         self.template = """QUESTION: {query}
@@ -44,22 +46,101 @@ class Utils():
         return response
  
         
-    def storeDataIntoChroma(self, docsPath: str, chromaDbPath: str, collectionName: str):
-        loader = DirectoryLoader(docsPath, glob="./*.pdf", loader_cls=PyPDFLoader)
-        documents = loader.load()
+    def storeDataIntoChroma(self, docsPath: str, chromaDbPath: str, collectionName: str, file: str):
+        success = True
+        random_uuid = uuid.uuid4()
 
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=300)
-        docs = text_splitter.split_documents(documents)
+        try:
+            loader = DirectoryLoader(docsPath, glob=file, loader_cls=PyPDFLoader)
+            documents = loader.load()
 
-        embedding_function = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
+            text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=300)
+            docs = text_splitter.split_documents(documents)
 
-        database = Chroma.from_documents(docs, embedding_function, persist_directory=chromaDbPath, collection_name=collectionName)
+            print(f'DOCS 2: {docs}')
+            print(' ----------------------------------------------------- ')
+            print(' ----------------------------------------------------- ')
+            print(' ----------------------------------------------------- ')
+            print(' ----------------------------------------------------- ')
+            print(' ----------------------------------------------------- ')
 
-        data = database._collection.get()
+            embedding_function = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
 
-        print(data['documents'])
+            # client = chromadb.PersistentClient(path=chromaDbPath)
+            # collection = client.get_collection(collectionName)
+            # data = collection.get()
 
-        return data['documents']
+            # currentIds = data['ids']
+            # print(f'CURRENT IDS: {currentIds}')
+            # print(' ----------------------------------------------------- ')
+            # print(' ----------------------------------------------------- ')
+                
+            database = Chroma.from_documents(docs, embedding_function, persist_directory=chromaDbPath, collection_name=collectionName)
+
+            data = database._collection.get()
+            newIds = data['ids']
+
+            # setCurrentIds = set(currentIds)
+            # setNewIds = set(newIds)
+
+            # difference = setNewIds - setCurrentIds
+
+            # difference_list = list(difference)
+
+            # print(f"DATA {data}")
+
+            return newIds
+        except:
+            success = False
+            return success
+        
+
+    def storeDataIntoChromaAddDocs(self, docsPath: str, chromaDbPath: str, collectionName: str, file: str):
+        success = True
+
+        try:
+            loader = DirectoryLoader(docsPath, glob=file, loader_cls=PyPDFLoader)
+            documents = loader.load()
+
+            text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=300)
+            docs = text_splitter.split_documents(documents)
+
+            print(f'DOCS 2: {docs}')
+            print(' ----------------------------------------------------- ')
+            print(' ----------------------------------------------------- ')
+            print(' ----------------------------------------------------- ')
+            print(' ----------------------------------------------------- ')
+            print(' ----------------------------------------------------- ')
+
+            embedding_function = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
+
+            client = chromadb.PersistentClient(path=chromaDbPath)
+            collection = client.get_collection(collectionName)
+            data = collection.get()
+
+            currentIds = data['ids']
+            print(f'CURRENT IDS: {currentIds}')
+            print(' ----------------------------------------------------- ')
+            print(' ----------------------------------------------------- ')
+                
+            database = Chroma.from_documents(docs, embedding_function, persist_directory=chromaDbPath, collection_name=collectionName)
+
+            data = database._collection.get()
+            newIds = data['ids']
+
+            setCurrentIds = set(currentIds)
+            setNewIds = set(newIds)
+
+            difference = setNewIds - setCurrentIds
+
+            difference_list = list(difference)
+
+            print(f"DATA {data}")
+
+            return difference_list
+        except:
+            success = False
+            return success
     
 
     def storeDataIntoChromaTeleport(self, chromaDbPath: str, collectionName):
@@ -106,9 +187,35 @@ class Utils():
 
         data = collection.get()
 
-        print(data['documents'])
+        # print(data['documents'])
 
         return data
+    
+
+    def deleteDataFromChromaDb(self, chromaDbPath: str, collectionName: str):
+        client = chromadb.PersistentClient(path=chromaDbPath)
+        collection = client.get_collection(collectionName)
+
+        data = collection.delete(
+            ids=['2ef19a59-7f4c-43dd-a62e-82f692b57ea6'],
+            where={'source': '/Users/alexandreurluescu/Documents/current work/CogNex/CogNex-BE/server/users_documents2/662b5125b794abdb37153b58/Personal Data (2).pdf'}
+        )
+
+        print(data)
+
+    def deleteSpecificDataFromChromaDb(self, chromaDbPath: str, collectionName: str, source: str):
+        print(collectionName)
+        try:
+            client = chromadb.PersistentClient(path=chromaDbPath)
+            collection = client.get_collection(collectionName)
+
+            # collection.delete(ids="2ef19a59-7f4c-43dd-a62e-82f692b57ea6")
+            collection.delete(ids=source)
+
+            return True
+        except:
+            print('error')
+    
     
 
     def getRevevantInfoFromDb(self, chromaDbPath: str, collectionName: str, query: str):
@@ -147,6 +254,6 @@ class Utils():
             destination_file = os.path.join(destination_dir, file)
             try:
                 shutil.move(source_file, destination_file)
-                print(f"Moved: {source_file} to {destination_file}")
+                # print(f"Moved: {source_file} to {destination_file}")
             except Exception as e:
                 print(f"Error moving {source_file} to {destination_file}: {e}")
