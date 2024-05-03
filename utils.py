@@ -16,7 +16,7 @@ class Utils():
 
         self.openai_api_key = "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"
         
-        
+        self.chromaDbTeleportsPath = 'testing'
 
         self.template = """QUESTION: {query}
 
@@ -257,3 +257,36 @@ class Utils():
                 # print(f"Moved: {source_file} to {destination_file}")
             except Exception as e:
                 print(f"Error moving {source_file} to {destination_file}: {e}")
+    
+
+    def create_teleport(self, collectionName, chats):
+
+        print(f"CHATS: {chats}")
+        print(f"COLLECTION_NAME {collectionName}")
+        try:
+            ids = []
+            docs = []
+            metadatas = []
+            for chat in chats:
+                myData = self.getDataFromChromaDb(self.chromaDbTeleportsPath, chat)
+
+                print(myData)
+                ids = ids + myData['ids']
+                docs = docs + myData['documents']
+                metadatas = metadatas + myData['metadatas']
+
+            print(ids)
+            print(docs)
+            print(metadatas)
+
+
+            client = chromadb.PersistentClient(path="your_database_path")
+
+            # Create a new collection (replace "my_collection" with your desired collection name)
+            newCollection = client.create_collection(collectionName)
+            newCollection.add(ids=ids, documents=docs, metadatas=metadatas)
+
+            return True
+        
+        except:
+            return False

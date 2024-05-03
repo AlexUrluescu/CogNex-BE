@@ -659,12 +659,17 @@ def create_teleport():
     teleportStored = db.teleports.find_one({"_id": savedTeleport.inserted_id})
     teleportStored['_id'] = str(teleportStored['_id'])
 
-    # utils.storeDataIntoChromaTeleport()
-
-
     print(teleportStored)
+    success = utils.create_teleport(teleportStored['_id'], teleportStored['chats'])
 
-    return jsonify({"message": "success", "ok": True, "teleport": teleportStored}), 200
+
+    if(success):
+        print("success")
+        return jsonify({"message": "success", "ok": True, "teleport": teleportStored}), 200
+    else:
+        print("error")
+        return jsonify({"message": "success", "ok": False }), 500
+
 
 def read_pdf_content(pdf_path):
     pdf_content = ''

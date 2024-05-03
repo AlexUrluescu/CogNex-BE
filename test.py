@@ -3,7 +3,9 @@ import chromadb
 import os
 
 chromaDbPath = 'testing'
-collectionName = '6630d26010acddc58c89afab'
+collectionName = '6634d26f1e32d0ffb14979eb'
+
+chats = ['663494c4caaba6ae1cdf725f', '6630f3545922b25e2b45e1cb']
 
 path = 'users_documents2/662b4b111d27688666af06ed'
 
@@ -13,11 +15,12 @@ src = '3d3b6bc1-9013-4d8d-a28a-f29e1f8e28a7'
 
 utils = Utils()
 
-data = utils.getDataFromChromaDb(chromaDbPath, collectionName='6630da2d02a3f7e7619a9ba5')
+data = utils.getDataFromChromaDb(chromaDbPath, collectionName='6630f3545922b25e2b45e1cb')
 print(data)
 
 # utils.deleteSpecificDataFromChromaDb(chromaDbPath, collectionName, src)
 
+utils.create_teleport(collectionName=collectionName, chats=chats)
 
 # def get_file_names(directory_path):
 #     files = os.listdir(directory_path)
