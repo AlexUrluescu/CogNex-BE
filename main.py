@@ -381,6 +381,31 @@ def handleUserSubscribed():
         return jsonify({"message": 'Chat not found', 'ok': False}), 404
     
 
+@app.route('/unsubscribed', methods=['POST'])
+def handleUserUnsubscribed():
+    query = request.json
+    userId = query['userId']
+    chatId = query['chatId']
+
+    chatFound = db.chats.find_one({"_id": ObjectId(chatId)})
+
+    array_of_objects = [obj for obj in chatFound['users'] if obj != userId]
+
+    db.chats.update_one(
+                {'_id': ObjectId(chatId)},
+                {'$set': {'users': array_of_objects}}
+            )
+
+    chatFound2 = db.chats.find_one({'_id': ObjectId(chatId)})
+
+
+    if chatFound2:
+        chatFound2['_id'] = str(chatFound2['_id'])
+        print(chatFound2['users'])
+        return jsonify({"message": 'success', 'ok': True, 'chat': chatFound2})
+    else:
+        return jsonify({"message": 'Chat not found', 'ok': False}), 404
+
 
 @app.route('/add-review', methods=['POST'])
 def handleAddReview():
