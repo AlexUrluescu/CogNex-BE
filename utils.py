@@ -9,6 +9,8 @@ from langchain.chains import LLMChain
 from langchain_core.prompts import PromptTemplate
 # from langchain_openai import OpenAI
 from langchain.chat_models import ChatOpenAI
+from langchain.prompts import PromptTemplate
+from langchain.chains import RetrievalQA
 import uuid
 class Utils():
 
@@ -18,28 +20,85 @@ class Utils():
         
         self.chromaDbTeleportsPath = 'testing'
 
-        self.template = """QUESTION: {query}
+        # self.template = """QUESTION: {query}
 
-            INFORMATION: {docs_prepared}
+        #     INFORMATION: {docs_prepared}
 
-            Please provide a reponse on base the INFORMATION.
+        #     Please provide a reponse on base the INFORMATION.
 
-            If you dont find anything similar in the INFORMATION, please responde with: "I dont have this information" """
+        #     If you dont find anything similar in the INFORMATION, please responde with: "I dont have this information" """
 
 
-    def getLlmResponse(self, query, docs_prepared):
+    def process_llm_response(self, llm_response):
+        print(llm_response['result'])
+        print("\n\nSources:")
+        for source in llm_response["source_documents"]:
+            print(source.metadata['source'])
+        
+        return llm_response['result']
+    
+    def getLlmResponseForChat(self, question, retriever, context):
 
-        print(query)
+        print(question)
+        
+        question = question
+        context = context
+        # question = 'Care este email-ul domnului Urluescu Alexandre, care are domeniul @ulbsibiu.ro?'
+        template = """Use all pieces of context to answer the question at the end and try not mix up the informations of them. If you don't know the answer, just say that you don't know, don't try to make up an answer. Use three sentences maximum. Keep the answer as concise as possible. Always answer in Romanian language. 
+        {context}s
+        Question: {question}
+        If you dont know the answer, responde with a kind answer
+        """
 
-        prompt = PromptTemplate.from_template(self.template)
+        QA_CHAIN_PROMPT = PromptTemplate.from_template(template)
+
+        # prompt = PromptTemplate.from_template(self.template)
         llm = ChatOpenAI(
-            model_name='gpt-3.5-turbo-16k',
+            # model_name='gpt-3.5-turbo-16k',
+            model_name='gpt-4',
             temperature=0.9,
             openai_api_key=self.openai_api_key,
-            max_tokens=50
+            max_tokens=200
         )
-        llm_chain = LLMChain(prompt=prompt, llm=llm)
-        response = llm_chain.invoke({"query": query, "docs_prepared": docs_prepared})
+        chain = RetrievalQA.from_chain_type(llm=llm, chain_type="stuff", retriever = retriever, return_source_documents = True, chain_type_kwargs={"prompt": QA_CHAIN_PROMPT} )
+        llm_response = chain(question)
+        response = self.process_llm_response(llm_response)
+        # llm_chain = LLMChain(prompt=prompt, llm=llm)
+        # response = llm_chain.invoke({"query": query, "docs_prepared": docs_prepared})
+
+        print(response)
+
+        return response
+ 
+
+    def getLlmResponse(self, question, retriever, context):
+
+        print(question)
+        
+        question = question
+        context = context
+        # question = 'Care este email-ul domnului Urluescu Alexandre, care are domeniul @ulbsibiu.ro?'
+        template = """Use all pieces of context to answer the question at the end and try not mix up the informations of them. If you don't know the answer, just say that you don't know, don't try to make up an answer. Use three sentences maximum. Keep the answer as concise as possible. Always answer in Romanian language. 
+        {context}s
+        Question: {question}
+        If you dont know the answer, responde with a kind answer
+        """
+
+        QA_CHAIN_PROMPT = PromptTemplate.from_template(template)
+
+        # prompt = PromptTemplate.from_template(self.template)
+        llm = ChatOpenAI(
+            # model_name='gpt-3.5-turbo-16k',
+            model_name='gpt-4',
+            temperature=0.9,
+            openai_api_key=self.openai_api_key,
+            max_tokens=700
+        )
+        chain = RetrievalQA.from_chain_type(llm=llm, chain_type="stuff", retriever = retriever, return_source_documents = True, chain_type_kwargs={"prompt": QA_CHAIN_PROMPT} )
+        llm_response = chain(question)
+        response = self.process_llm_response(llm_response)
+        # llm_chain = LLMChain(prompt=prompt, llm=llm)
+        # response = llm_chain.invoke({"query": query, "docs_prepared": docs_prepared})
 
         print(response)
 
@@ -216,22 +275,53 @@ class Utils():
         except:
             print('error')
     
+
+    def deleteChatFromTeleportChromaDb(self, chromaDbPathChats: str, collectionName: str, chromaDbTeleports: str, collectionTeleport: str):
+        print(collectionName)
+        
+        try:
+
+            data = self.getDataFromChromaDb(chromaDbPathChats, collectionName=collectionName)
+            print(data['ids'])
+            ids = data['ids']
+            client = chromadb.PersistentClient(path=chromaDbTeleports)
+            collection = client.get_collection(collectionTeleport)
+
+            # collection.delete(ids="2ef19a59-7f4c-43dd-a62e-82f692b57ea6")
+            collection.delete(ids=ids)
+
+            return True
+        except:
+            print('error')
+    
+    def getRevevantInfoFromDbForChat(self, chromaDbPath: str, collectionName: str):
+        embedding_function = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
+        db3 = Chroma(persist_directory=chromaDbPath, embedding_function=embedding_function, collection_name=collectionName)
+        retriever = db3.as_retriever(search_type="similarity", search_kwargs = {"k": 3})
+
+        return retriever
     
 
-    def getRevevantInfoFromDb(self, chromaDbPath: str, collectionName: str, query: str):
-        client = chromadb.PersistentClient(path=chromaDbPath)
-        collection = client.get_collection(collectionName)
+    def getRevevantInfoFromDb(self, chromaDbPath: str, collectionName: str):
+        embedding_function = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
+        db3 = Chroma(persist_directory=chromaDbPath, embedding_function=embedding_function, collection_name=collectionName)
+        retriever = db3.as_retriever(search_type="similarity", search_kwargs = {"k": 10})
 
-        results = collection.query(
-            query_texts=[query],
-            n_results=1
-        )
+        return retriever
 
-        print(results)
+        # client = chromadb.PersistentClient(path=chromaDbPath)
+        # collection = client.get_collection(collectionName)
 
-        print(collectionName)
+        # results = collection.query(
+        #     query_texts=[query],
+        #     n_results=1
+        # )
 
-        return results['documents'][0][0]
+        # print(results)
+
+        # print(collectionName)
+
+        # return results['documents'][0][0]
 
         # retriever = collection.as_retriever(search_type="similarity", search_kwargs = {"k": 5})
 
@@ -290,3 +380,7 @@ class Utils():
         
         except:
             return False
+        
+    
+    def delete_chat_from_teleport():
+        pass

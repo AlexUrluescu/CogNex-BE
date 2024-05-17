@@ -149,7 +149,97 @@ def add_cods():
         return jsonify({"message": 'success', 'ok': True, 'chat': chatUpdated})
     else:
         return jsonify({"message": 'Chat not found', 'ok': False}), 500
+    
 
+@app.route('/edit_chat', methods=['PUT'])
+def edit_chat():
+    query = request.json
+    # documentId = query['documentId']
+    chat = query['chat']
+
+    chatFound = db.chats.find_one({'_id': ObjectId(chat['_id'])})
+
+    print(chat)
+
+    db.chats.update_one(
+                {'_id': ObjectId(chat['_id'])},
+                {'$set': {'name': chat['name'], 'category': chat['category'], 'color': chat['color'], 'description': chat['description']}}
+            )
+
+    chatFound2 = db.chats.find_one({'_id': ObjectId(chat['_id'])})
+
+    chatFound2['_id'] = str(chatFound2['_id'])
+
+
+    return jsonify({"message": 'success', 'ok': True, 'chat': chatFound2})
+ 
+@app.route('/edit_user', methods=['PUT'])
+def edit_user():
+    query = request.json
+    # documentId = query['documentId']
+    user = query['user']
+
+    chatFound = db.users.find_one({'_id': ObjectId(user['_id'])})
+
+    print(user)
+
+    db.users.update_one(
+                {'_id': ObjectId(user['_id'])},
+                {'$set': {'ocupation': user['ocupation'], 'country': user['country'], 'description': user['description'], 'age': user['age']}}
+            )
+
+    userFound2 = db.users.find_one({'_id': ObjectId(user['_id'])})
+
+    userFound2['_id'] = str(userFound2['_id'])
+
+
+    return jsonify({"message": 'success', 'ok': True, 'user': userFound2})
+    
+
+@app.route('/edit_teleport', methods=['PUT'])
+def edit_teleport():
+    query = request.json
+    # documentId = query['documentId']
+    teleport = query['teleport']
+
+    chatFound = db.chats.find_one({'_id': ObjectId(teleport['_id'])})
+
+    print(teleport)
+
+    db.teleports.update_one(
+                {'_id': ObjectId(teleport['_id'])},
+                {'$set': {'name': teleport['name'], 'category': teleport['category'], 'color': teleport['color'], 'description': teleport['description']}}
+            )
+
+    teleportFound2 = db.teleports.find_one({'_id': ObjectId(teleport['_id'])})
+
+    teleportFound2['_id'] = str(teleportFound2['_id'])
+
+
+    return jsonify({"message": 'success', 'ok': True, 'teleport': teleportFound2})
+
+@app.route('/change_vizibility_chat', methods=['PUT'])
+def change_vizibility_chat():
+    query = request.json
+    # documentId = query['documentId']
+    chat = query['chat']
+
+    chatFound = db.chats.find_one({'_id': ObjectId(chat['_id'])})
+
+    print(chat)
+
+    db.chats.update_one(
+                {'_id': ObjectId(chat['_id'])},
+                {'$set': {'vizibility': chat['vizibility']}}
+            )
+
+    chatFound2 = db.chats.find_one({'_id': ObjectId(chat['_id'])})
+
+    chatFound2['_id'] = str(chatFound2['_id'])
+
+
+    return jsonify({"message": 'success', 'ok': True, 'chat': chatFound2})
+    
 
 @app.route('/delete-docs', methods=['DELETE'])
 def delete_files_from_chat():
@@ -183,7 +273,40 @@ def delete_files_from_chat():
         return jsonify({"message": 'failed', 'ok': False})
 
 
+@app.route('/delete-chat-from-teleport', methods=['DELETE'])
+def delete_chat_from_teleport():
+    chromadbTeleport = 'your_database_path'
+    query = request.json
+    chatId = query['chatId']
+    teleportId = query['teleportId']
 
+    teleportFound = db.teleports.find_one({'_id': ObjectId(teleportId)})
+
+    # chatFound['files'].remove(filename)
+    print(chatId)
+    print(teleportFound['chats'])
+
+    array_of_chats = [chat for chat in teleportFound['chats'] if chat != chatId]
+
+    print(array_of_chats)
+
+    db.teleports.update_one(
+                {'_id': ObjectId(teleportId)},
+                {'$set': {'chats': array_of_chats}}
+            )
+
+    teleportFound2 = db.teleports.find_one({'_id': ObjectId(teleportId)})
+
+    teleportFound2['_id'] = str(teleportFound2['_id'])
+
+    # success = utils.deleteSpecificDataFromChromaDb(chromaDbPath, chatId, documentId)
+    success = utils.deleteChatFromTeleportChromaDb(chromaDbPathChats='testing', collectionName=chatId, chromaDbTeleports= chromadbTeleport, collectionTeleport=teleportId)
+
+    if(success):
+        return jsonify({"message": 'success', 'ok': True, 'teleport': teleportFound2})
+    
+    else:
+        return jsonify({"message": 'failed', 'ok': False})
 
 def testing(subDirectory, filename):
     # Ensure that the requested file is a PDF
@@ -353,9 +476,24 @@ def getDocsFromChromaCollectByChat():
 
     print(chatId)
 
-    results = utils.getRevevantInfoFromDb(chromaDbPath, chatId, question)
+    retriever = utils.getRevevantInfoFromDb(chromaDbPath, chatId)
+    context = 'You are an assistent, what answers to the people questions. Please use the all context from the documents received'
+    llmResponse = utils.getLlmResponse(question=question, retriever=retriever, context=context)
 
-    llmResponse = utils.getLlmResponse(query=question, docs_prepared=results)
+    return jsonify({"message": 'success', 'ok': True, 'response': llmResponse})
+
+@app.route('/info-teleport', methods=['POST']) 
+def getDocsFromChromaCollectByTeleport():
+    chromadbTeleport = 'your_database_path'
+    query = request.json
+    teleportId = query['teleportId']
+    question = query['query']
+
+    print(teleportId)
+
+    retriever = utils.getRevevantInfoFromDb(chromadbTeleport, teleportId)
+    context = 'You are an assistent, what answers to the people questions. Please use the all context from the documents received'
+    llmResponse = utils.getLlmResponse(question=question, retriever=retriever, context = context)
 
     return jsonify({"message": 'success', 'ok': True, 'response': llmResponse})
 
@@ -670,6 +808,47 @@ def create_teleport():
         print("error")
         return jsonify({"message": "success", "ok": False }), 500
 
+
+@app.route('/delete_teleport', methods=['DELETE']) 
+def delete_teleport():
+    query = request.json
+    teleportId = query['teleportId']
+    print(teleportId)
+
+    teleportDeleted = db.teleports.delete_one({"_id": ObjectId(teleportId)})
+
+    print(f"teleportDeleted {teleportDeleted}")
+
+    # teleportDeleted['_id'] = str(teleportDeleted['_id'])
+
+
+    if(teleportDeleted != ''):
+        print("success")
+        return jsonify({"message": "success", "ok": True, "teleport": teleportId}), 200
+    else:
+        print("error")
+        return jsonify({"message": "success", "ok": False }), 500
+    
+
+@app.route('/delete_chat', methods=['DELETE']) 
+def delete_chat():
+    query = request.json
+    chatId = query['chatId']
+    print(chatId)
+
+    chatDeleted = db.chats.delete_one({"_id": ObjectId(chatId)})
+
+    print(f"chatDeleted {chatDeleted}")
+
+    # teleportDeleted['_id'] = str(teleportDeleted['_id'])
+
+
+    if(chatDeleted != ''):
+        print("success")
+        return jsonify({"message": "success", "ok": True, "chat": chatId}), 200
+    else:
+        print("error")
+        return jsonify({"message": "success", "ok": False }), 500
 
 def read_pdf_content(pdf_path):
     pdf_content = ''
