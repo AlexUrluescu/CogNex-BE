@@ -1,4 +1,5 @@
 
+import base64
 import glob
 from aiModelClass import AskChat
 import os
@@ -12,6 +13,7 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from flask_pymongo import pymongo
 from utils import Utils
+from bson import Binary
 app = Flask(__name__)
 
 load_dotenv()
@@ -26,6 +28,7 @@ CONNECTION_STRING_MONGODB = os.environ.get("CONNECTION_STRING_MONGODB")
 utils = Utils()
 
 chromaDbPath = 'testing'
+chromaDbTeleportsPath = 'teleports'
 
 client = pymongo.MongoClient(CONNECTION_STRING_MONGODB, tls=True, tlsAllowInvalidCertificates=True)
 db = client.get_database('AiChat')
@@ -37,7 +40,8 @@ pdf_directory = '/Users/alexandreurluescu/Documents/current work/CogNex/CogNex-B
 
 user_documents_global_directory = '/Users/alexandreurluescu/Documents/current work/CogNex/CogNex-BE/server/users_documents'
 
-
+PDFS = []
+FILES = []
 
 @app.route('/api/pdfs', methods=['GET'])
 def get_pdfs():
@@ -63,6 +67,246 @@ def serve_pdf(filename):
     
     # Serve the PDF file
     return file
+
+
+@app.route('/pdfs', methods=['POST'])
+def serve_pdf3():
+    query = request.json
+    filename = query['filename']
+    userId = query['userId']
+    # Ensure that the requested file is a PDF
+    if not filename.lower().endswith('.pdf'):
+        return "Not a PDF file", 400
+    
+    reletivPathUsersDocs = 'users_documents'
+    userDirectoryDocsPath = os.path.join(reletivPathUsersDocs, userId)
+    
+    # Get the full path of the requested PDF file
+    file_path = os.path.join(userDirectoryDocsPath, filename)
+    
+    # Check if the file exists
+    if not os.path.isfile(file_path):
+        return "PDF not found", 404
+    
+    file = send_from_directory(userDirectoryDocsPath, filename)
+    
+    # Serve the PDF file
+    return file
+
+@app.route('/add-docs', methods=['POST']) 
+def add_cods():
+    query = request.json
+    chat = query['chat']
+
+
+    print("chat", chat)
+    print("chatFiles", chat['files'])
+
+    # creatorId = chat['creator']
+
+    # savedChat = db.chats.insert_one(chat)
+
+    # chatStored = db.chats.find_one({"_id":  ObjectId(chat['_id'])})
+    # chatStored['_id'] = str(chatStored['_id'])
+
+    subdirectory_path = os.path.join(app.config['USERS_DOCUMENTS2'], str(chat['creator']))
+    
+    files = get_file_names(subdirectory_path)
+
+    print(f"FILES2: {files}")
+    print("   ------------------------- ")
+    print("   ------------------------- ")
+    print("   ------------------------- ")
+    print("   ------------------------- ")
+    print("   ------------------------- ")
+
+    result = []
+
+
+    difference_list = utils.storeDataIntoChromaAddDocs(subdirectory_path, chromaDbPath, str(chat['_id']), files[0])
+
+    fileObject = {'name': files[0],
+                    'documentId': difference_list
+    }
+
+    result.append(fileObject)
+
+    print(f'RESULT: {result}')
+    
+    result.extend(chat['files'])
+    merged_array = result
+
+    print(f"MERGED: {merged_array}")
+
+    chatUpdated = db.chats.find_one_and_update(
+            {'_id': ObjectId(chat['_id'])},
+            {'$set': {'files': merged_array}}, 
+        return_document=True
+    )
+
+    if chatUpdated:
+        chatUpdated['_id'] = str(chatUpdated['_id'])
+        return jsonify({"message": 'success', 'ok': True, 'chat': chatUpdated})
+    else:
+        return jsonify({"message": 'Chat not found', 'ok': False}), 500
+    
+
+@app.route('/edit_chat', methods=['PUT'])
+def edit_chat():
+    query = request.json
+    # documentId = query['documentId']
+    chat = query['chat']
+
+    chatFound = db.chats.find_one({'_id': ObjectId(chat['_id'])})
+
+    print(chat)
+
+    db.chats.update_one(
+                {'_id': ObjectId(chat['_id'])},
+                {'$set': {'name': chat['name'], 'category': chat['category'], 'color': chat['color'], 'description': chat['description']}}
+            )
+
+    chatFound2 = db.chats.find_one({'_id': ObjectId(chat['_id'])})
+
+    chatFound2['_id'] = str(chatFound2['_id'])
+
+
+    return jsonify({"message": 'success', 'ok': True, 'chat': chatFound2})
+ 
+@app.route('/edit_user', methods=['PUT'])
+def edit_user():
+    query = request.json
+    # documentId = query['documentId']
+    user = query['user']
+
+    chatFound = db.users.find_one({'_id': ObjectId(user['_id'])})
+
+    print(user)
+
+    db.users.update_one(
+                {'_id': ObjectId(user['_id'])},
+                {'$set': {'ocupation': user['ocupation'], 'country': user['country'], 'description': user['description'], 'age': user['age']}}
+            )
+
+    userFound2 = db.users.find_one({'_id': ObjectId(user['_id'])})
+
+    userFound2['_id'] = str(userFound2['_id'])
+
+
+    return jsonify({"message": 'success', 'ok': True, 'user': userFound2})
+    
+
+@app.route('/edit_teleport', methods=['PUT'])
+def edit_teleport():
+    query = request.json
+    # documentId = query['documentId']
+    teleport = query['teleport']
+
+    chatFound = db.chats.find_one({'_id': ObjectId(teleport['_id'])})
+
+    print(teleport)
+
+    db.teleports.update_one(
+                {'_id': ObjectId(teleport['_id'])},
+                {'$set': {'name': teleport['name'], 'category': teleport['category'], 'color': teleport['color'], 'description': teleport['description']}}
+            )
+
+    teleportFound2 = db.teleports.find_one({'_id': ObjectId(teleport['_id'])})
+
+    teleportFound2['_id'] = str(teleportFound2['_id'])
+
+
+    return jsonify({"message": 'success', 'ok': True, 'teleport': teleportFound2})
+
+@app.route('/change_vizibility_chat', methods=['PUT'])
+def change_vizibility_chat():
+    query = request.json
+    # documentId = query['documentId']
+    chat = query['chat']
+
+    chatFound = db.chats.find_one({'_id': ObjectId(chat['_id'])})
+
+    print(chat)
+
+    db.chats.update_one(
+                {'_id': ObjectId(chat['_id'])},
+                {'$set': {'vizibility': chat['vizibility']}}
+            )
+
+    chatFound2 = db.chats.find_one({'_id': ObjectId(chat['_id'])})
+
+    chatFound2['_id'] = str(chatFound2['_id'])
+
+
+    return jsonify({"message": 'success', 'ok': True, 'chat': chatFound2})
+    
+
+@app.route('/delete-docs', methods=['DELETE'])
+def delete_files_from_chat():
+    query = request.json
+    documentId = query['documentId']
+    chatId = query['chatId']
+
+    chatFound = db.chats.find_one({'_id': ObjectId(chatId)})
+
+    # chatFound['files'].remove(filename)
+    print(documentId)
+    print(chatFound['files'])
+
+    array_of_objects = [obj for obj in chatFound['files'] if obj['documentId'] != documentId]
+
+    db.chats.update_one(
+                {'_id': ObjectId(chatId)},
+                {'$set': {'files': array_of_objects}}
+            )
+
+    chatFound2 = db.chats.find_one({'_id': ObjectId(chatId)})
+
+    chatFound2['_id'] = str(chatFound2['_id'])
+
+    success = utils.deleteSpecificDataFromChromaDb(chromaDbPath, chatId, documentId)
+
+    if(success):
+        return jsonify({"message": 'success', 'ok': True, 'chat': chatFound2})
+    
+    else:
+        return jsonify({"message": 'failed', 'ok': False})
+
+
+@app.route('/delete-chat-from-teleport', methods=['DELETE'])
+def delete_chat_from_teleport():
+    chromadbTeleport = 'your_database_path'
+    query = request.json
+    chatId = query['chatId']
+    teleportId = query['teleportId']
+
+    teleportFound = db.teleports.find_one({'_id': ObjectId(teleportId)})
+
+    # chatFound['files'].remove(filename)
+    print(chatId)
+    print(teleportFound['chats'])
+
+    array_of_chats = [chat for chat in teleportFound['chats'] if chat != chatId]
+
+    print(array_of_chats)
+
+    db.teleports.update_one(
+                {'_id': ObjectId(teleportId)},
+                {'$set': {'chats': array_of_chats}}
+            )
+
+    teleportFound2 = db.teleports.find_one({'_id': ObjectId(teleportId)})
+
+    teleportFound2['_id'] = str(teleportFound2['_id'])
+
+    # success = utils.deleteSpecificDataFromChromaDb(chromaDbPath, chatId, documentId)
+    success = utils.deleteChatFromTeleportChromaDb(chromaDbPathChats='testing', collectionName=chatId, chromaDbTeleports= chromadbTeleport, collectionTeleport=teleportId)
+
+    if(success):
+        return jsonify({"message": 'success', 'ok': True, 'teleport': teleportFound2})
+    
+    else:
+        return jsonify({"message": 'failed', 'ok': False})
 
 def testing(subDirectory, filename):
     # Ensure that the requested file is a PDF
@@ -152,8 +396,6 @@ def get_all_users():
 
 
 
-
-
 @app.route("/chats", methods=['GET'])
 def get_all_chats():
     chats = list(db.chats.find({}))
@@ -162,6 +404,16 @@ def get_all_chats():
         chat['_id'] = str(chat['_id'])
 
     return jsonify({"message": 'success', 'ok': True, 'chats': chats})
+
+
+@app.route("/teleports", methods=['GET'])
+def get_all_teleports():
+    teleports = list(db.teleports.find({}))
+
+    for teleport in teleports:
+        teleport['_id'] = str(teleport['_id'])
+
+    return jsonify({"message": 'success', 'ok': True, 'teleports': teleports})
 
 
 @app.route('/testApi/<path:userId>', methods=['GET'])
@@ -206,10 +458,12 @@ def handleUserLogin():
     if(userFound == None):
         return jsonify({'message': "no user found", 'ok': False, "user": None})
 
-    if(userFound['password'] != user['password']):
-        return jsonify({"message": "password incorrect", 'ok': False, "user": None})
+    # if(userFound['password'] != user['password']):
+    #     return jsonify({"message": "password incorrect", 'ok': False, "user": None})
     
     userFound['_id'] = str(userFound['_id'])
+    # image_data_base64 = base64.b64encode(userFound['photo'].read()).decode("utf-8")
+    # userFound['photo'] = image_data_base64
 
     return jsonify({"message": 'success', 'ok': True, 'user': userFound})
 
@@ -220,9 +474,26 @@ def getDocsFromChromaCollectByChat():
     chatId = query['chatId']
     question = query['query']
 
-    results = utils.getRevevantInfoFromDb(chromaDbPath, chatId, question)
+    print(chatId)
 
-    llmResponse = utils.getLlmResponse(query=question, docs_prepared=results)
+    retriever = utils.getRevevantInfoFromDb(chromaDbPath, chatId)
+    context = 'You are an assistent, what answers to the people questions. Please use the all context from the documents received'
+    llmResponse = utils.getLlmResponse(question=question, retriever=retriever, context=context)
+
+    return jsonify({"message": 'success', 'ok': True, 'response': llmResponse})
+
+@app.route('/info-teleport', methods=['POST']) 
+def getDocsFromChromaCollectByTeleport():
+    chromadbTeleport = 'your_database_path'
+    query = request.json
+    teleportId = query['teleportId']
+    question = query['query']
+
+    print(teleportId)
+
+    retriever = utils.getRevevantInfoFromDb(chromadbTeleport, teleportId)
+    context = 'You are an assistent, what answers to the people questions. Please use the all context from the documents received'
+    llmResponse = utils.getLlmResponse(question=question, retriever=retriever, context = context)
 
     return jsonify({"message": 'success', 'ok': True, 'response': llmResponse})
 
@@ -237,6 +508,52 @@ def handleUserSubscribed():
     chatUpdated = db.chats.find_one_and_update(
         {'_id': ObjectId(chatId)},
         {'$addToSet': {'users': userId}}, 
+        return_document=True
+    )
+
+    if chatUpdated:
+        chatUpdated['_id'] = str(chatUpdated['_id'])
+        print(chatUpdated['users'])
+        return jsonify({"message": 'success', 'ok': True, 'chat': chatUpdated})
+    else:
+        return jsonify({"message": 'Chat not found', 'ok': False}), 404
+    
+
+@app.route('/unsubscribed', methods=['POST'])
+def handleUserUnsubscribed():
+    query = request.json
+    userId = query['userId']
+    chatId = query['chatId']
+
+    chatFound = db.chats.find_one({"_id": ObjectId(chatId)})
+
+    array_of_objects = [obj for obj in chatFound['users'] if obj != userId]
+
+    db.chats.update_one(
+                {'_id': ObjectId(chatId)},
+                {'$set': {'users': array_of_objects}}
+            )
+
+    chatFound2 = db.chats.find_one({'_id': ObjectId(chatId)})
+
+
+    if chatFound2:
+        chatFound2['_id'] = str(chatFound2['_id'])
+        print(chatFound2['users'])
+        return jsonify({"message": 'success', 'ok': True, 'chat': chatFound2})
+    else:
+        return jsonify({"message": 'Chat not found', 'ok': False}), 404
+
+
+@app.route('/add-review', methods=['POST'])
+def handleAddReview():
+    query = request.json
+    review = query['review']
+    chatId = query['chatId']
+
+    chatUpdated = db.chats.find_one_and_update(
+        {'_id': ObjectId(chatId)},
+        {'$addToSet': {'reviews': review}}, 
         return_document=True
     )
 
@@ -282,18 +599,47 @@ def handleUserRegister():
 
 #     return jsonify(chatMessage)
 
+@app.route('/upload-photo', methods=['POST']) 
+def upload_photo():
+    if 'images' not in request.files:
+        return jsonify({'error': 'No PDF part'})
+
+    images = request.files.getlist('images')
+
+    print(images)
+    print(images[0])
+
+    image_data = images[0].read()
+
+    image_doc = {'image': Binary(image_data)}
+
+    test2 = {
+        'name': 'Alex'
+    }
+
+    print("intraaa1")
+
+    user = db.poze.insert_one(image_doc)
+    db.users.update_one({'_id': ObjectId('65e46bd58d312e7ab5895adf')}, {'$set': {'photo': image_doc['image']}})
+    print(user)
+
+    chatStored = db.poze.find_one({"name": 'Alex'})
+
+    print("intraaaa")
+    return jsonify({'message': 'Images uploaded successfully', "ok": True})
+
 
 @app.route('/extract', methods=['POST']) 
 def extract_content():
-    print(f"req {request.files}")
+    # print(f"req {request.files}")
     if 'pdfs' not in request.files:
         return jsonify({'error': 'No PDF part'})
 
     pdfs = request.files.getlist('pdfs')
     userId = request.form['userId']
 
-    print(f"pdf {pdfs}")
-    print(f"userId {userId}")
+    print(f"PDFS {pdfs}")
+    # print(f"userId {userId}")
 
     for pdf in pdfs:
 
@@ -303,6 +649,7 @@ def extract_content():
         # Save the PDF file
         subdirectory_path = os.path.join(app.config['USERS_DOCUMENTS2'], userId)
         pdf_path = os.path.join(subdirectory_path, pdf.filename)
+        print(f"PDF PATH: {pdf_path}")
         pdf.save(pdf_path)
 
         user = db.users.find_one({'_id': ObjectId(userId)})
@@ -324,9 +671,18 @@ def extract_content():
         else:
             return 'User not found', 404
     
+    files = get_file_names(subdirectory_path)
+
+    print(f"FILES: {files}")
+    print(f"len(pdfs) {len(pdfs)}")
+    print(f"len(files) {len(files)}")
+
+    if(len(files) == len(pdfs)):
     # utils.storeDataIntoChroma(subdirectory_path, chromaDbPath, userId)
-        
-    return jsonify({'message': 'PDF uploaded successfully', "ok": True})
+        return jsonify({'message': 'PDF uploaded successfully', "ok": True})
+    else:
+        return jsonify({'message': 'error', "ok": False})
+
 
 
 def delete_files_in_directory(directory):
@@ -342,13 +698,24 @@ def delete_files_in_directory(directory):
         except Exception as e:
             print(f"Error deleting {file}: {e}")
 
+def count_files(directory_path):
+    files = os.listdir(directory_path)
+    file_count = len([file for file in files if os.path.isfile(os.path.join(directory_path, file))])
+    return file_count
 
+def get_file_names(directory_path):
+    files = os.listdir(directory_path)
+    file_names = [file for file in files if os.path.isfile(os.path.join(directory_path, file))]
+    return file_names
 
 @app.route('/create_chat', methods=['POST']) 
 def create_chat_room():
     query = request.json
     chat = query['chat']
 
+    # files2 = get_file_names('users_documents2/662b5125b794abdb37153b58')
+
+    # print(f"FILES2: {files2}")
     print("chat", chat)
     print("chatFiles", chat['files'])
 
@@ -360,15 +727,128 @@ def create_chat_room():
     chatStored['_id'] = str(chatStored['_id'])
 
     subdirectory_path = os.path.join(app.config['USERS_DOCUMENTS2'], str(chatStored['creator']))
-    subdirectory_path2 = os.path.join(app.config['USERS_DOCUMENTS'], str(chatStored['creator']))
+    
+    files = get_file_names(subdirectory_path)
 
-    utils.storeDataIntoChroma(subdirectory_path, chromaDbPath, str(chatStored['_id']))
+    print(f"FILES2: {files}")
+    print("   ------------------------- ")
+    print("   ------------------------- ")
+    print("   ------------------------- ")
+    print("   ------------------------- ")
+    print("   ------------------------- ")
+
+    result = []
+
+    for file in files:
+        documentIds = utils.storeDataIntoChroma(subdirectory_path, chromaDbPath, str(chatStored['_id']), file)
+
+        print(f'random_uuid_str2: {documentIds}')
+
+        fileObject = {'name': file,
+                    'documentId': documentIds
+                    }
+
+        result.append(fileObject)
+
+    
+    print(f"RESULT: {result}")
+
+    
+
+    chatUpdated = db.chats.find_one_and_update(
+        {'_id': ObjectId(chatStored['_id'])},
+        {'$set': {'files': result}}, 
+        return_document=True
+    )
+
+    chatUpdated['_id'] = str(chatUpdated['_id'])
+
+
+    if(chatUpdated['_id'] != ''):
+        return jsonify({"message": "success", "ok": True, "chat": chatUpdated}), 200
+    
+    else:
+         return jsonify({"message": "error", "ok": False, "chat": None}), 500
+    
+
+@app.route('/removing_old_pdfs', methods=['POST']) 
+def remove_old_pdfs():
+    query = request.json
+    creator = query['creator']
+
+    print(f"creator {creator}")
+
+    subdirectory_path = os.path.join(app.config['USERS_DOCUMENTS2'], creator)
+    subdirectory_path2 = os.path.join(app.config['USERS_DOCUMENTS'], creator)
 
     utils.move_files(subdirectory_path, subdirectory_path2)
 
-    return jsonify({"message": "success", "ok": True, "chat": chatStored}), 200
+    return jsonify({"message": "success", "ok": True, "success": True }), 200
 
 
+
+@app.route('/create_teleport', methods=['POST']) 
+def create_teleport():
+    query = request.json
+    teleport = query['teleport']
+    print(teleport)
+    savedTeleport = db.teleports.insert_one(teleport)
+
+    teleportStored = db.teleports.find_one({"_id": savedTeleport.inserted_id})
+    teleportStored['_id'] = str(teleportStored['_id'])
+
+    print(teleportStored)
+    success = utils.create_teleport(teleportStored['_id'], teleportStored['chats'])
+
+
+    if(success):
+        print("success")
+        return jsonify({"message": "success", "ok": True, "teleport": teleportStored}), 200
+    else:
+        print("error")
+        return jsonify({"message": "success", "ok": False }), 500
+
+
+@app.route('/delete_teleport', methods=['DELETE']) 
+def delete_teleport():
+    query = request.json
+    teleportId = query['teleportId']
+    print(teleportId)
+
+    teleportDeleted = db.teleports.delete_one({"_id": ObjectId(teleportId)})
+
+    print(f"teleportDeleted {teleportDeleted}")
+
+    # teleportDeleted['_id'] = str(teleportDeleted['_id'])
+
+
+    if(teleportDeleted != ''):
+        print("success")
+        return jsonify({"message": "success", "ok": True, "teleport": teleportId}), 200
+    else:
+        print("error")
+        return jsonify({"message": "success", "ok": False }), 500
+    
+
+@app.route('/delete_chat', methods=['DELETE']) 
+def delete_chat():
+    query = request.json
+    chatId = query['chatId']
+    print(chatId)
+
+    chatDeleted = db.chats.delete_one({"_id": ObjectId(chatId)})
+
+    print(f"chatDeleted {chatDeleted}")
+
+    # teleportDeleted['_id'] = str(teleportDeleted['_id'])
+
+
+    if(chatDeleted != ''):
+        print("success")
+        return jsonify({"message": "success", "ok": True, "chat": chatId}), 200
+    else:
+        print("error")
+        return jsonify({"message": "success", "ok": False }), 500
 
 def read_pdf_content(pdf_path):
     pdf_content = ''
