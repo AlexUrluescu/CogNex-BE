@@ -1,2 +1,5 @@
 .env
 *.ipynb
+users_documents
+uploads
+testing
